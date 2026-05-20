@@ -1,7 +1,6 @@
 {
   "name": "mini-crm",
   "version": "1.0.0",
-  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -10,7 +9,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.103.2",
     "cors": "^2.8.6",
