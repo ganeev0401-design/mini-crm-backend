@@ -3,15 +3,13 @@ dotenv.config()
 
 import express from "express"
 import cors from "cors"
+//app.use(cors())
 import { createClient } from "@supabase/supabase-js"
 import { Bot } from "grammy"
 
 console.log("STARTING SERVER...")
 
 import crypto from "crypto"
-
-// import cors from "cors"
-// app.use(cors())
 
 // --- EXPRESS ---
 const app = express()
@@ -136,12 +134,12 @@ bot.hears("➕ Добавить проект", (ctx) => {
 bot.hears(/Мои клиенты/, async (ctx) => {
   console.log("Кнопка 'Мои клиенты' нажата")
 
-  const userId = ctx.from.id.toString()
+  const teligram_id = ctx.from.id.toString()
 
   const { data, error } = await supabase
     .from("clients")
     .select("*")
-    .eq("user_id", userId)
+    .eq("telegram_id", userId)
 
   if (error) {
     console.log(error)
@@ -163,12 +161,12 @@ bot.hears(/Мои клиенты/, async (ctx) => {
 
 // Мои проекты
 bot.hears("📁 Мои проекты", async (ctx) => {
-  const userId = ctx.from.id.toString()
+  const telegram_id = ctx.from.id.toString()
 
   const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("user_id", userId)
+    .eq("telegram_id", userId)
 
   if (error) {
     console.log(error)
@@ -198,8 +196,8 @@ bot.hears("📁 Мои проекты", async (ctx) => {
 
 // обработка ввода текста (для добавления клиента)
 bot.on("message:text", async (ctx) => {
-  const userId = ctx.from.id
-  const state = userStates[userId]
+  const telegram_id = ctx.from.id
+  const state = userStates[telegram_id]
 
   if (!state) return
 
@@ -231,18 +229,18 @@ bot.on("message:text", async (ctx) => {
   if (state.step === "deadline") {
     state.deadline = ctx.message.text
 
-    const { error } = await supabase.from("projects").insert([
-      {
-        user_id: userId.toString(),
-        client_name: state.client_name,
-        title: state.title,
-        budget: Number(state.budget),
-        deadline: state.deadline,
-        status: "active"
-      }
+    await supabase.from("projects").insert([
+    {
+    telegram_id: userId.toString(),
+    client_name: state.client_name,
+    title: state.title,
+    budget: Number(state.budget),
+    deadline: state.deadline,
+    status: "active"
+    }
     ])
 
-    userStates[userId] = null
+    userStates[telegram_id] = null
 
     if (error) {
       console.log(error)
