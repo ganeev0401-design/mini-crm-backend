@@ -1,12 +1,17 @@
-require('dotenv').config()
-const express = require('express')
-const { createClient } = require('@supabase/supabase-js')
-const { Bot } = require("grammy")
+import dotenv from "dotenv"
+dotenv.config()
 
-const crypto = require("crypto")
-
+import express from "express"
 import cors from "cors"
-app.use(cors())
+import { createClient } from "@supabase/supabase-js"
+import { Bot } from "grammy"
+
+console.log("STARTING SERVER...")
+
+import crypto from "crypto"
+
+// import cors from "cors"
+// app.use(cors())
 
 // --- EXPRESS ---
 const app = express()
