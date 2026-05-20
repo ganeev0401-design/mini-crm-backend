@@ -196,7 +196,7 @@ bot.hears("📁 Мои проекты", async (ctx) => {
 
 // обработка ввода текста (для добавления клиента)
 bot.on("message:text", async (ctx) => {
-  const telegram_id = ctx.from.id
+  const telegram_id = ctx.from.id.toString()
   const state = userStates[telegram_id]
 
   if (!state) return
@@ -229,7 +229,7 @@ bot.on("message:text", async (ctx) => {
   if (state.step === "deadline") {
     state.deadline = ctx.message.text
 
-    await supabase.from("projects").insert([
+   const { error } = await supabase.from("projects").insert([
     {
     telegram_id: telegram_id.toString(),
     client_name: state.client_name,
@@ -240,15 +240,15 @@ bot.on("message:text", async (ctx) => {
     }
     ])
 
-    userStates[telegram_id] = null
+  userStates[telegram_id] = null
 
-    if (error) {
-      console.log(error)
-      return ctx.reply("Ошибка при сохранении проекта 😢")
-    }
-
-    return ctx.reply("Проект добавлен 🚀")
+  if (error) {
+  console.log(error)
+  return ctx.reply("Ошибка при сохранении проекта 😢")
   }
-})
+
+  return ctx.reply("Проект добавлен 🚀")
+  }
+  })
 
 bot.start()
