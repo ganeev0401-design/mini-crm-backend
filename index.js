@@ -134,12 +134,12 @@ bot.hears("➕ Добавить проект", (ctx) => {
 bot.hears(/Мои клиенты/, async (ctx) => {
   console.log("Кнопка 'Мои клиенты' нажата")
 
-  const teligram_id = ctx.from.id.toString()
+  const telegram_id = ctx.from.id.toString()
 
   const { data, error } = await supabase
     .from("clients")
     .select("*")
-    .eq("telegram_id", userId)
+    .eq("telegram_id", telegram_id)
 
   if (error) {
     console.log(error)
@@ -166,7 +166,7 @@ bot.hears("📁 Мои проекты", async (ctx) => {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("telegram_id", userId)
+    .eq("telegram_id", telegram_id)
 
   if (error) {
     console.log(error)
@@ -231,7 +231,7 @@ bot.on("message:text", async (ctx) => {
 
     await supabase.from("projects").insert([
     {
-    telegram_id: userId.toString(),
+    telegram_id: telegram_id.toString(),
     client_name: state.client_name,
     title: state.title,
     budget: Number(state.budget),
