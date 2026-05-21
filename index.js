@@ -88,26 +88,29 @@ async function checkDeadlines() {
       : 999
 
     // если не уведомляли или прошло больше 24 часов
-    if (!last || diffHours > 24) {
-      await bot.api.sendMessage(
-        p.telegram_id,
-        `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "💸 Оплачен", callback_data: `paid_${p.id}` }],
-              [{ text: "📨 Написать клиенту", callback_data: `write_${p.id}` }],
-              [{ text: "⏰ +3 дня", callback_data: `shift_${p.id}` }]
-            ]
-          }
+   try {
+    await bot.api.sendMessage(
+      p.telegram_id,
+      `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💸 Оплачен", callback_data: `paid_${p.id}` }],
+            [{ text: "📨 Написать клиенту", callback_data: `write_${p.id}` }],
+            [{ text: "⏰ +3 дня", callback_data: `shift_${p.id}` }]
+          ]
         }
-      )
+      }
+    )
 
-    // 🔥 обновляем время уведомления
+    // обновляем только если отправка успешна
     await supabase
       .from("projects")
       .update({ last_notified_at: new Date() })
       .eq("id", p.id)
+
+  } catch (err) {
+    console.log("Ошибка отправки:", p.telegram_id, err.message)
   }
 }
 
