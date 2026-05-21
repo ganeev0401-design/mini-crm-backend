@@ -178,6 +178,43 @@ bot.hears(/Мои клиенты/, async (ctx) => {
 })
 
 // -------------------- PROJECTS --------------------
+bot.hears(/Мои деньги|💰 Мои деньги/, async (ctx) => {
+  const telegram_id = ctx.from.id.toString()
+
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("telegram_id", telegram_id)
+
+  if (!projects || projects.length === 0) {
+    return ctx.reply("Пока нет данных 📭")
+  }
+
+  let total = 0
+  let paid = 0
+  let unpaid = 0
+
+  for (const p of projects) {
+    total += Number(p.budget || 0)
+
+    if (p.paid) {
+      paid += Number(p.budget || 0)
+    } else {
+      unpaid += Number(p.budget || 0)
+    }
+  }
+
+  ctx.reply(
+`💰 Финансы:
+
+📊 Всего проектов: ${projects.length}
+💸 Всего денег: ${total}₽
+✅ Получено: ${paid}₽
+⚠️ В ожидании: ${unpaid}₽`
+  )
+})
+
+
 bot.hears("📁 Мои проекты", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
 
