@@ -325,8 +325,30 @@ bot.on("callback_query:data", async (ctx) => {
     return ctx.answerCallbackQuery("Перенесено ⏰")
   }
 
-  if (data.startsWith("write_")) {
-    return ctx.reply("Напиши клиенту вручную через Telegram 🙂")
+    if (data.startsWith("write_")) {
+    const id = data.split("_")[1]
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (!project) {
+      return ctx.reply("Проект не найден 😢")
+    }
+
+    const message = 
+    `Привет!
+
+    Напоминаю про оплату проекта "${project.title}" 🙂
+
+    💰 Сумма: ${project.budget}₽
+    📅 Дедлайн был: ${project.deadline}
+
+    Буду благодарен за оплату 🙌`
+
+      return ctx.reply(message)
   }
 })
 
