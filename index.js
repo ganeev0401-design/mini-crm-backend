@@ -81,26 +81,35 @@ async function checkDeadlines() {
 
     // ❌ ПРОСРОЧКА
     if (deadline < now) {
+    const last = p.last_notified_at ? new Date(p.last_notified_at) : null
+
+    const diffHours = last
+      ? (now - last) / (1000 * 60 * 60)
+      : 999
+
+    // если не уведомляли или прошло больше 24 часов
+    if (!last || diffHours > 24) {
       await bot.api.sendMessage(
         p.telegram_id,
         `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`,
         {
           reply_markup: {
             inline_keyboard: [
-              [
-                { text: "💸 Оплачен", callback_data: `paid_${p.id}` }
-              ],
-              [
-                { text: "📨 Написать клиенту", callback_data: `write_${p.id}` }
-              ],
-              [
-                { text: "⏰ +3 дня", callback_data: `shift_${p.id}` }
-              ]
+              [{ text: "💸 Оплачен", callback_data: `paid_${p.id}` }],
+              [{ text: "📨 Написать клиенту", callback_data: `write_${p.id}` }],
+              [{ text: "⏰ +3 дня", callback_data: `shift_${p.id}` }]
             ]
           }
         }
       )
-    }
+
+    // 🔥 обновляем время уведомления
+    await supabase
+      .from("projects")
+      .update({ last_notified_at: new Date() })
+      .eq("id", p.id)
+  }
+}
 
     // 📅 дедлайн скоро
     const diff = (deadline - now) / (1000 * 60 * 60 * 24)
@@ -150,6 +159,7 @@ bot.command("start", async (ctx) => {
         ["➕ Добавить проект"],
         ["📊 Мои клиенты"],
         ["📁 Мои проекты"]
+        ["🔥 Приоритет"]
       ],
       resize_keyboard: true
     }
@@ -239,6 +249,59 @@ bot.hears("📁 Мои проекты", async (ctx) => {
   })
 
   ctx.reply(msg)
+})
+
+bot.hears("🔥 Приоритет", async (ctx) => {
+  const telegram_id = ctx.from.id.toString()
+
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("telegram_id", telegram_id)
+
+  if (error || !projects) {
+    return ctx.reply("Ошибка 😢")
+  }
+
+  if (projects.length === 0) {
+    return ctx.reply("Нет проектов 🤷‍♂️")
+  }
+
+  const now = new Date()
+
+  const scored = projects.map(p => {
+    const deadline = new Date(p.deadline)
+    const diffDays = Math.floor((now - deadline) / (1000 * 60 * 60 * 24))
+
+    let score = 0
+
+    if (diffDays > 0) {
+      score += 100 + diffDays // просрочка
+    }
+
+    score += Number(p.budget) / 1000 // вес денег
+
+    return { ...p, score, diffDays }
+  })
+
+  // сортировка по важности
+  scored.sort((a, b) => b.score - a.score)
+
+  let message = "🔥 ТОП приоритетов:\n\n"
+
+  scored.slice(0, 5).forEach((p, i) => {
+    message +=
+`#${i + 1}
+👤 ${p.client_name}
+📌 ${p.title}
+💰 ${p.budget}₽
+📅 ${p.deadline}
+⚠️ ${p.diffDays > 0 ? "Просрочен " + p.diffDays + " дн." : "Ок"}
+
+`
+  })
+
+  ctx.reply(message)
 })
 
 // -------------------- CREATE PROJECT FLOW --------------------
