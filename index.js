@@ -14,6 +14,9 @@ import crypto from "crypto"
 // --- EXPRESS ---
 const app = express()
 app.use(express.json())
+app.use(cors({
+  origin: "https://mini-crm-app-sigma.vercel.app"
+}))
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -34,6 +37,41 @@ const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT)
 })
+
+//Функция проверки deadline
+async function checkDeadlines() {
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("*")
+
+  const now = new Date()
+
+  for (const p of projects) {
+    if (p.paid) continue
+
+    const deadline = new Date(p.deadline)
+
+    // просрочено
+    if (deadline < now) {
+      await bot.api.sendMessage(
+        p.telegram_id,
+        `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`
+      )
+    }
+
+    // дедлайн завтра
+    const diff = (deadline - now) / (1000 * 60 * 60 * 24)
+
+    if (diff > 0 && diff < 1) {
+      await bot.api.sendMessage(
+        p.telegram_id,
+        `📅 ДЕДЛАЙН СКОРО\n\nПроект: ${p.title}\nОсталось < 24 часов`
+      )
+    }
+  }
+}
+setInterval(checkDeadlines, 60 * 1000)
+
 
 // endpoint на beckend
 app.post("/auth", async (req, res) => {
