@@ -333,9 +333,18 @@ bot.on("message:text", async (ctx) => {
 
   if (state.step === "budget") {
     state.budget = Number(ctx.message.text)
+    state.step = "phone"
+
+    return ctx.reply("Телефон клиента? (например 79991234567)")
+  }
+  if (state.step === "phone") {
+    state.client_phone = ctx.message.text
     state.step = "deadline"
+
     return ctx.reply("Дедлайн?")
   }
+
+
 
   if (state.step === "deadline") {
     state.deadline = ctx.message.text
@@ -344,6 +353,7 @@ bot.on("message:text", async (ctx) => {
       {
         telegram_id,
         client_name: state.client_name,
+        client_phone: state.client_phone,
         title: state.title,
         budget: state.budget,
         deadline: state.deadline,
@@ -413,8 +423,34 @@ bot.on("callback_query:data", async (ctx) => {
     📅 Дедлайн был: ${project.deadline}
 
     Буду благодарен за оплату 🙌`
+    
+    const phone = project.client_phone
 
-      return ctx.reply(message)
+    if (!phone) {
+      return ctx.reply("У клиента нет телефона 😢")
+    }
+
+    const text = encodeURIComponent(
+    `Привет!
+
+    Напоминаю про оплату проекта "${project.title}" 🙂
+
+    💰 Сумма: ${project.budget}₽
+    📅 Дедлайн был: ${project.deadline}
+
+    Буду благодарен за оплату 🙌`
+    )
+
+    const link = `https://t.me/+${phone}?text=${text}`
+
+    return ctx.reply("📨 Написать клиенту:", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Открыть чат", url: link }]
+        ]
+      }
+    })
+
   }
 })
 
