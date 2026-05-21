@@ -70,84 +70,91 @@ async function checkDeadlines() {
     .from("projects")
     .select("*")
 
-  const now = new Date()
-
   if (!projects) return
+
+  const now = new Date()
 
   for (const p of projects) {
     if (p.paid) continue
 
     const deadline = new Date(p.deadline)
 
+    // =========================
     // ❌ ПРОСРОЧКА
+    // =========================
     if (deadline < now) {
-    const last = p.last_notified_at ? new Date(p.last_notified_at) : null
+      const last = p.last_overdue_notified_at
+        ? new Date(p.last_overdue_notified_at)
+        : null
 
-    const diffHours = last
-      ? (now - last) / (1000 * 60 * 60)
-      : 999
+      const diffHours = last
+        ? (now - last) / (1000 * 60 * 60)
+        : 999
 
-    // если не уведомляли или прошло больше 24 часов
-   try {
-    await bot.api.sendMessage(
-      p.telegram_id,
-      `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💸 Оплачен", callback_data: `paid_${p.id}` }],
-            [{ text: "📨 Написать клиенту", callback_data: `write_${p.id}` }],
-            [{ text: "⏰ +3 дня", callback_data: `shift_${p.id}` }]
-          ]
+      if (!last || diffHours > 24) {
+        try {
+          await bot.api.sendMessage(
+            p.telegram_id,
+            `⚠️ ПРОСРОЧКА\n\nПроект: ${p.title}\nКлиент: ${p.client_name}\nСумма: ${p.budget}₽`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "💸 Оплачен", callback_data: `paid_${p.id}` }],
+                  [{ text: "📨 Написать клиенту", callback_data: `write_${p.id}` }],
+                  [{ text: "⏰ +3 дня", callback_data: `shift_${p.id}` }]
+                ]
+              }
+            }
+          )
+
+          await supabase
+            .from("projects")
+            .update({ last_overdue_notified_at: new Date() })
+            .eq("id", p.id)
+
+        } catch (err) {
+          console.log("Ошибка просрочки:", err.message)
         }
       }
-    )
+    }
 
-    // обновляем только если отправка успешна
-    await supabase
-      .from("projects")
-      .update({ last_notified_at: new Date() })
-      .eq("id", p.id)
+    // =========================
+    // 📅 ДЕДЛАЙН СКОРО
+    // =========================
+    const diffDays = (deadline - now) / (1000 * 60 * 60 * 24)
 
-  } catch (err) {
-    console.log("Ошибка отправки:", p.telegram_id, err.message)
-  }
-}
+    if (diffDays > 0 && diffDays < 1) {
+      const last = p.last_deadline_notified_at
+        ? new Date(p.last_deadline_notified_at)
+        : null
 
-    // 📅 дедлайн скоро
-    const diff = (deadline - now) / (1000 * 60 * 60 * 24)
+      const diffHours = last
+        ? (now - last) / (1000 * 60 * 60)
+        : 999
 
-      if (diff > 0 && diff < 1) {
-        const last = p.last_notified_at ? new Date(p.last_notified_at) : null
+      if (!last || diffHours > 24) {
+        try {
+          await bot.api.sendMessage(
+            p.telegram_id,
+            `📅 ДЕДЛАЙН СКОРО\n\nПроект: ${p.title}\nОсталось < 24 часов`
+          )
 
-        const diffHours = last
-          ? (now - last) / (1000 * 60 * 60)
-          : 999
+          await supabase
+            .from("projects")
+            .update({ last_deadline_notified_at: new Date() })
+            .eq("id", p.id)
 
-        if (!last || diffHours > 24) {
-          try {
-            await bot.api.sendMessage(
-        p.telegram_id,
-        `📅 ДЕДЛАЙН СКОРО\n\nПроект: ${p.title}\nОсталось < 24 часов`
-      )
-
-      await supabase
-        .from("projects")
-        .update({ last_notified_at: new Date() })
-        .eq("id", p.id)
-
-    } catch (err) {
-      console.log("Ошибка дедлайна:", err.message)
+        } catch (err) {
+          console.log("Ошибка дедлайна:", err.message)
+        }
+      }
     }
   }
 }
 
-  }
-}
+setInterval(checkDeadlines, 5 * 60 * 1000)
 
-setInterval(checkDeadlines, 60 * 1000)
-
-// -------------------- EXPRESS ROUTES --------------------
+// -------------------- EXPRESS ROUTES -----------------s---
 app.get("/", (req, res) => {
   res.send("CRM работает 🚀")
 })
@@ -313,17 +320,17 @@ bot.hears("🔥 Приоритет", async (ctx) => {
 
   scored.slice(0, 5).forEach((p, i) => {
     message +=
-`#${i + 1}
-👤 ${p.client_name}
-📌 ${p.title}
-💰 ${p.budget}₽
-📅 ${p.deadline}
-⚠️ ${p.diffDays > 0 ? "Просрочен " + p.diffDays + " дн." : "Ок"}
+      `#${i + 1}
+      👤 ${p.client_name}
+      📌 ${p.title}
+      💰 ${p.budget}₽
+      📅 ${p.deadline}
+      ⚠️ ${p.diffDays > 0 ? "Просрочен " + p.diffDays + " дн." : "Ок"}
 
-`
-  })
+      `
+        })
 
-  ctx.reply(message)
+      ctx.reply(message)
 })
 
 // -------------------- CREATE PROJECT FLOW --------------------
