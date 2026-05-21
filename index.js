@@ -117,12 +117,31 @@ async function checkDeadlines() {
     // 📅 дедлайн скоро
     const diff = (deadline - now) / (1000 * 60 * 60 * 24)
 
-    if (diff > 0 && diff < 1) {
-      await bot.api.sendMessage(
+      if (diff > 0 && diff < 1) {
+        const last = p.last_notified_at ? new Date(p.last_notified_at) : null
+
+        const diffHours = last
+          ? (now - last) / (1000 * 60 * 60)
+          : 999
+
+        if (!last || diffHours > 24) {
+          try {
+            await bot.api.sendMessage(
         p.telegram_id,
         `📅 ДЕДЛАЙН СКОРО\n\nПроект: ${p.title}\nОсталось < 24 часов`
       )
+
+      await supabase
+        .from("projects")
+        .update({ last_notified_at: new Date() })
+        .eq("id", p.id)
+
+    } catch (err) {
+      console.log("Ошибка дедлайна:", err.message)
     }
+  }
+}
+
   }
 }
 
@@ -423,7 +442,7 @@ bot.on("callback_query:data", async (ctx) => {
     📅 Дедлайн был: ${project.deadline}
 
     Буду благодарен за оплату 🙌`
-    
+
     const phone = project.client_phone
 
     if (!phone) {
