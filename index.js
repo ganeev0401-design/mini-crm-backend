@@ -348,9 +348,10 @@ bot.hears("📅 Мои записи", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
 
   const { data } = await supabase
-    .from("appointments")
+    .from("projects")
     .select("*")
     .eq("telegram_id", telegram_id)
+    .eq("status", "beauty")
     .order("appointment_time", { ascending: true }) // 👈 сортировка
 
   if (!data?.length) {
@@ -590,7 +591,7 @@ bot.on("callback_query:data", async (ctx) => {
   const id = data.split("_")[2]
 
   await supabase
-    .from("appointments")
+    .from("projects")
     .update({ status: "cancelled" })
     .eq("id", id)
 
@@ -602,7 +603,7 @@ bot.on("callback_query:data", async (ctx) => {
   const id = data.split("_")[2]
 
   const { data: a } = await supabase
-    .from("appointments")
+    .from("projects")
     .select("*")
     .eq("id", id)
     .single()
@@ -611,7 +612,7 @@ bot.on("callback_query:data", async (ctx) => {
   newDate.setDate(newDate.getDate() + 1)
 
   await supabase
-    .from("appointments")
+    .from("projects")
     .update({ appointment_time: newDate })
     .eq("id", id)
 
@@ -632,7 +633,7 @@ bot.on("callback_query:data", async (ctx) => {
     return ctx.answerCallbackQuery("Перенесено ⏰")
   }
     if (data.startsWith("a_write_")) {
-    const id = data.split("_")[1]
+    const id = data.split("_")[2]
 
     const { data: project } = await supabase
     .from("projects")
