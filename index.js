@@ -316,7 +316,7 @@ bot.hears(/Мои деньги|💰 Мои деньги/, async (ctx) => {
   )
 })
 
-
+// Freelance projects list
 bot.hears("📁 Мои проекты", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
 
@@ -341,6 +341,39 @@ bot.hears("📁 Мои проекты", async (ctx) => {
   })
 
   ctx.reply(msg)
+})
+
+// Beauty projects list
+bot.hears("📅 Мои записи", async (ctx) => {
+  const telegram_id = ctx.from.id.toString()
+
+  const { data } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("telegram_id", telegram_id)
+    .order("appointment_time", { ascending: true }) // 👈 сортировка
+
+  if (!data?.length) {
+    return ctx.reply("Записей пока нет 🤷‍♂️")
+  }
+
+  for (const a of data) {
+    await ctx.reply(
+`👤 ${a.client_name}
+💅 ${a.service}
+💰 ${a.price}₽
+📅 ${a.appointment_time}`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📨 Написать", callback_data: `a_write_${a.id}` }],
+            [{ text: "⏰ Перенести", callback_data: `a_shift_${a.id}` }],
+            [{ text: "❌ Отменить", callback_data: `a_cancel_${a.id}` }]
+          ]
+        }
+      }
+    )
+  }
 })
 
 bot.hears("🔥 Приоритет", async (ctx) => {
