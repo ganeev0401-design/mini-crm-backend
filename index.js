@@ -633,4 +633,6 @@ bot.on("callback_query:data", async (ctx) => {
 })
 
 // --------------------
-bot.start()
+if (process.env.NODE_ENV === "production") {
+  bot.start()
+}
