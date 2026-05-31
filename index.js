@@ -607,16 +607,7 @@ bot.on("callback_query:data", async (ctx) => {
       return ctx.reply("У клиента нет телефона 😢")
     }
 
-    const text = encodeURIComponent(message)(
-    `Привет!
-
-    Напоминаю про оплату проекта "${project.title}" 🙂
-
-    💰 Сумма: ${project.budget}₽
-    📅 Дедлайн был: ${project.deadline}
-
-    Буду благодарен за оплату 🙌`
-    )
+    const text = encodeURIComponent(message)
 
     const link = `https://t.me/+${phone}?text=${text}`
 
@@ -627,7 +618,6 @@ bot.on("callback_query:data", async (ctx) => {
         ]
       }
     })
-
   }
 })
 
