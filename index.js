@@ -335,7 +335,7 @@ bot.hears("📁 Мои проекты", async (ctx) => {
     msg += `#${i + 1}
 👤 ${p.client_name}
 📌 ${p.title}
-💰 ${p.budget}
+💰 Сумма: ${p.budget || 0}₽
 📅 ${p.deadline}
 \n`
   })
@@ -386,7 +386,7 @@ bot.hears("🔥 Приоритет", async (ctx) => {
       `#${i + 1}
       👤 ${p.client_name}
       📌 ${p.title}
-      💰 ${p.budget}₽
+      💰 Сумма: ${p.budget || 0}₽
       📅 ${p.deadline}
       ⚠️ ${p.diffDays > 0 ? "Просрочен " + p.diffDays + " дн." : "Ок"}
 
@@ -569,15 +569,21 @@ bot.on("callback_query:data", async (ctx) => {
     if (data.startsWith("write_")) {
     const id = data.split("_")[1]
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("*")
-      .eq("telegram_id", project.telegram_id)
-      .single()
+    const { data: project } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .single()
 
     if (!project) {
       return ctx.reply("Проект не найден 😢")
     }
+
+    const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("telegram_id", project.telegram_id)
+    .single()
 
     let message = ""
 
