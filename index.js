@@ -171,24 +171,49 @@ app.listen(PORT, () => {
 })
 
 // -------------------- BOT --------------------
+// bot.command("start", async (ctx) => {
+//   const telegram_id = ctx.from.id.toString()
+//   const name = ctx.from.first_name
+
+//   await supabase.from("users").upsert(
+//     [{ telegram_id, name }],
+//     { onConflict: "telegram_id" }
+//   )
+
+//   ctx.reply("Добро пожаловать в CRM 🚀", {
+//     reply_markup: {
+//       keyboard: [
+//         [{ text: "🚀 Открыть CRM", web_app: { url: "https://mini-crm-app-sigma.vercel.app/" } }],
+//         ["➕ Добавить клиента"],
+//         ["➕ Добавить проект"],
+//         ["📊 Мои клиенты"],
+//         ["📁 Мои проекты"],
+//         ["🔥 Приоритет"]
+//       ],
+//       resize_keyboard: true
+//     }
+//   })
+// })
+
 bot.command("start", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
   const name = ctx.from.first_name
 
+  // Presets
   await supabase.from("users").upsert(
-    [{ telegram_id, name }],
-    { onConflict: "telegram_id" }
-  )
+  [{
+    telegram_id,
+    name,
+    preset: "beauty" // <-- временно для теста
+  }],
+  { onConflict: "telegram_id" }
+  ) 
 
-  ctx.reply("Добро пожаловать в CRM 🚀", {
+  ctx.reply("Кто ты? 👇", {
     reply_markup: {
       keyboard: [
-        [{ text: "🚀 Открыть CRM", web_app: { url: "https://mini-crm-app-sigma.vercel.app/" } }],
-        ["➕ Добавить клиента"],
-        ["➕ Добавить проект"],
-        ["📊 Мои клиенты"],
-        ["📁 Мои проекты"],
-        ["🔥 Приоритет"]
+        ["💻 Фрилансер"],
+        ["💅 Бьюти мастер"]
       ],
       resize_keyboard: true
     }
@@ -214,6 +239,44 @@ bot.hears(/Мои клиенты/, async (ctx) => {
   })
 
   ctx.reply(msg)
+})
+// ------------------ BEAUTY CLIENT -----------------
+bot.hears("💻 Фрилансер", async (ctx) => {
+  const telegram_id = ctx.from.id.toString()
+
+  await supabase
+    .from("users")
+    .update({ role: "freelancer" })
+    .eq("telegram_id", telegram_id)
+
+  return ctx.reply("Готово 🚀", {
+    reply_markup: {
+      keyboard: [
+        ["➕ Добавить проект"],
+        ["📁 Мои проекты"]
+      ],
+      resize_keyboard: true
+    }
+  })
+})
+
+bot.hears("💅 Бьюти мастер", async (ctx) => {
+  const telegram_id = ctx.from.id.toString()
+
+  await supabase
+    .from("users")
+    .update({ role: "beauty" })
+    .eq("telegram_id", telegram_id)
+
+  return ctx.reply("Готово 💅", {
+    reply_markup: {
+      keyboard: [
+        ["➕ Новая запись"],
+        ["📋 Мои записи"]
+      ],
+      resize_keyboard: true
+    }
+  })
 })
 
 // -------------------- PROJECTS --------------------
@@ -398,6 +461,77 @@ bot.on("message:text", async (ctx) => {
   }
 })
 
+// -------------------- CREATE PROJECT FLOW FOR BEAUTY--------------------
+bot.hears("➕ Новая запись", (ctx) => {
+  userStates[ctx.from.id] = { step: "b_client" }
+  ctx.reply("Имя клиента?")
+})
+
+// ===== BEAUTY FLOW =====
+if (state?.step === "b_client") {
+  state.client_name = ctx.message.text
+  state.step = "b_phone"
+  return ctx.reply("Телефон или @username клиента?")
+}
+
+if (state?.step === "b_phone") {
+  state.client_phone = ctx.message.text
+  state.step = "b_date"
+  return ctx.reply("Дата записи? (например 2025-03-10)")
+}
+
+if (state?.step === "b_date") {
+  state.date = ctx.message.text
+  state.step = "b_time"
+  return ctx.reply("Время? (например 14:00)")
+}
+
+if (state?.step === "b_time") {
+  state.time = ctx.message.text
+  state.step = "b_service"
+  return ctx.reply("Какая услуга?")
+}
+
+if (state?.step === "b_service") {
+  state.service = ctx.message.text
+  state.step = "b_price"
+  return ctx.reply("Стоимость?")
+}
+
+if (state?.step === "b_price") {
+  state.price = Number(ctx.message.text)
+  state.step = "b_prepay"
+  return ctx.reply("Предоплата?")
+}
+
+if (state?.step === "b_prepay") {
+  state.prepayment = Number(ctx.message.text)
+
+  const appointment_at = new Date(`${state.date}T${state.time}`)
+
+  const { error } = await supabase.from("projects").insert([
+    {
+      telegram_id,
+      client_name: state.client_name,
+      client_phone: state.client_phone,
+      service: state.service,
+      budget: state.price,
+      prepayment: state.prepayment,
+      appointment_at,
+      status: "beauty"
+    }
+  ])
+
+  userStates[ctx.from.id] = null
+
+  if (error) {
+    console.log(error)
+    return ctx.reply("Ошибка 😢")
+  }
+
+  return ctx.reply("Запись создана 💅")
+}
+
 // -------------------- CALLBACKS --------------------
 bot.on("callback_query:data", async (ctx) => {
   const data = ctx.callbackQuery.data
@@ -430,17 +564,33 @@ bot.on("callback_query:data", async (ctx) => {
     if (data.startsWith("write_")) {
     const id = data.split("_")[1]
 
-    const { data: project } = await supabase
-      .from("projects")
+    const { data: user } = await supabase
+      .from("users")
       .select("*")
-      .eq("id", id)
+      .eq("telegram_id", project.telegram_id)
       .single()
 
     if (!project) {
       return ctx.reply("Проект не найден 😢")
     }
 
-    const message = 
+    let message = ""
+
+    if (user?.preset === "beauty") {
+      message = 
+    `Привет, ${project.client_name}! 💅
+
+    Ты записана на услугу:
+
+    📌 ${project.title}
+    📅 ${project.deadline}
+
+    💰 Стоимость: ${project.budget}₽
+
+    Буду ждать тебя ❤️`
+    } else {
+      // дефолт = фриланс
+      message = 
     `Привет!
 
     Напоминаю про оплату проекта "${project.title}" 🙂
@@ -449,6 +599,7 @@ bot.on("callback_query:data", async (ctx) => {
     📅 Дедлайн был: ${project.deadline}
 
     Буду благодарен за оплату 🙌`
+    }
 
     const phone = project.client_phone
 
@@ -456,7 +607,7 @@ bot.on("callback_query:data", async (ctx) => {
       return ctx.reply("У клиента нет телефона 😢")
     }
 
-    const text = encodeURIComponent(
+    const text = encodeURIComponent(message)(
     `Привет!
 
     Напоминаю про оплату проекта "${project.title}" 🙂
