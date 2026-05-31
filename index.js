@@ -585,6 +585,39 @@ bot.on("callback_query:data", async (ctx) => {
     return ctx.answerCallbackQuery("Оплачено 💸")
   }
 
+  // Отмена по бьюти
+  if (data.startsWith("a_cancel_")) {
+  const id = data.split("_")[2]
+
+  await supabase
+    .from("appointments")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+
+  return ctx.answerCallbackQuery("Отменено ❌")
+  }
+  
+  // Перенос по бьюти
+  if (data.startsWith("a_shift_")) {
+  const id = data.split("_")[2]
+
+  const { data: a } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  const newDate = new Date(a.appointment_time)
+  newDate.setDate(newDate.getDate() + 1)
+
+  await supabase
+    .from("appointments")
+    .update({ appointment_time: newDate })
+    .eq("id", id)
+
+  return ctx.answerCallbackQuery("Перенесено ⏰")
+  }
+
   if (data.startsWith("shift_")) {
     const id = data.split("_")[1]
 
@@ -598,8 +631,7 @@ bot.on("callback_query:data", async (ctx) => {
 
     return ctx.answerCallbackQuery("Перенесено ⏰")
   }
-
-    if (data.startsWith("write_")) {
+    if (data.startsWith("a_write_")) {
     const id = data.split("_")[1]
 
     const { data: project } = await supabase
