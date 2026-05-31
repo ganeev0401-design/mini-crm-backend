@@ -397,9 +397,15 @@ bot.hears("🔥 Приоритет", async (ctx) => {
 })
 
 // -------------------- CREATE PROJECT FLOW --------------------
+
 bot.hears("➕ Добавить проект", (ctx) => {
   userStates[ctx.from.id] = { step: "client_name" }
   ctx.reply("Введи имя клиента:")
+})
+
+bot.hears("➕ Новая запись", (ctx) => {
+  userStates[ctx.from.id] = { step: "b_client" }
+  ctx.reply("Имя клиента?")
 })
 
 bot.on("message:text", async (ctx) => {
@@ -407,6 +413,78 @@ bot.on("message:text", async (ctx) => {
   const state = userStates[ctx.from.id]
 
   if (!state) return
+
+  // =========================
+  // 💅 BEAUTY FLOW
+  // =========================
+
+  if (state.step === "b_client") {
+    state.client_name = ctx.message.text
+    state.step = "b_phone"
+    return ctx.reply("Телефон или @username клиента?")
+  }
+
+  if (state.step === "b_phone") {
+    state.client_phone = ctx.message.text
+    state.step = "b_date"
+    return ctx.reply("Дата записи? (например 2025-03-10)")
+  }
+
+  if (state.step === "b_date") {
+    state.date = ctx.message.text
+    state.step = "b_time"
+    return ctx.reply("Время? (например 14:00)")
+  }
+
+  if (state.step === "b_time") {
+    state.time = ctx.message.text
+    state.step = "b_service"
+    return ctx.reply("Какая услуга?")
+  }
+
+  if (state.step === "b_service") {
+    state.service = ctx.message.text
+    state.step = "b_price"
+    return ctx.reply("Стоимость?")
+  }
+
+  if (state.step === "b_price") {
+    state.price = Number(ctx.message.text)
+    state.step = "b_prepay"
+    return ctx.reply("Предоплата?")
+  }
+
+  if (state.step === "b_prepay") {
+    state.prepayment = Number(ctx.message.text)
+
+    const appointment_at = new Date(`${state.date}T${state.time}`)
+
+    const { error } = await supabase.from("projects").insert([
+      {
+        telegram_id,
+        client_name: state.client_name,
+        client_phone: state.client_phone,
+        title: state.service,
+        budget: state.price,
+        prepayment: state.prepayment,
+        deadline: appointment_at,
+        status: "beauty"
+      }
+    ])
+
+    userStates[ctx.from.id] = null
+
+    if (error) {
+      console.log(error)
+      return ctx.reply("Ошибка 😢")
+    }
+
+    return ctx.reply("Запись создана 💅")
+  }
+
+  // =========================
+  // 💻 FREELANCE FLOW
+  // =========================
 
   if (state.step === "client_name") {
     state.client_name = ctx.message.text
@@ -423,17 +501,14 @@ bot.on("message:text", async (ctx) => {
   if (state.step === "budget") {
     state.budget = Number(ctx.message.text)
     state.step = "phone"
-
     return ctx.reply("Телефон клиента? (например 79991234567)")
   }
+
   if (state.step === "phone") {
     state.client_phone = ctx.message.text
     state.step = "deadline"
-
     return ctx.reply("Дедлайн?")
   }
-
-
 
   if (state.step === "deadline") {
     state.deadline = ctx.message.text
@@ -461,76 +536,6 @@ bot.on("message:text", async (ctx) => {
   }
 })
 
-// -------------------- CREATE PROJECT FLOW FOR BEAUTY--------------------
-bot.hears("➕ Новая запись", (ctx) => {
-  userStates[ctx.from.id] = { step: "b_client" }
-  ctx.reply("Имя клиента?")
-})
-
-// ===== BEAUTY FLOW =====
-if (state?.step === "b_client") {
-  state.client_name = ctx.message.text
-  state.step = "b_phone"
-  return ctx.reply("Телефон или @username клиента?")
-}
-
-if (state?.step === "b_phone") {
-  state.client_phone = ctx.message.text
-  state.step = "b_date"
-  return ctx.reply("Дата записи? (например 2025-03-10)")
-}
-
-if (state?.step === "b_date") {
-  state.date = ctx.message.text
-  state.step = "b_time"
-  return ctx.reply("Время? (например 14:00)")
-}
-
-if (state?.step === "b_time") {
-  state.time = ctx.message.text
-  state.step = "b_service"
-  return ctx.reply("Какая услуга?")
-}
-
-if (state?.step === "b_service") {
-  state.service = ctx.message.text
-  state.step = "b_price"
-  return ctx.reply("Стоимость?")
-}
-
-if (state?.step === "b_price") {
-  state.price = Number(ctx.message.text)
-  state.step = "b_prepay"
-  return ctx.reply("Предоплата?")
-}
-
-if (state?.step === "b_prepay") {
-  state.prepayment = Number(ctx.message.text)
-
-  const appointment_at = new Date(`${state.date}T${state.time}`)
-
-  const { error } = await supabase.from("projects").insert([
-    {
-      telegram_id,
-      client_name: state.client_name,
-      client_phone: state.client_phone,
-      service: state.service,
-      budget: state.price,
-      prepayment: state.prepayment,
-      appointment_at,
-      status: "beauty"
-    }
-  ])
-
-  userStates[ctx.from.id] = null
-
-  if (error) {
-    console.log(error)
-    return ctx.reply("Ошибка 😢")
-  }
-
-  return ctx.reply("Запись создана 💅")
-}
 
 // -------------------- CALLBACKS --------------------
 bot.on("callback_query:data", async (ctx) => {
