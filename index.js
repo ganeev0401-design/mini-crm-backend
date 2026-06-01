@@ -672,7 +672,7 @@ bot.on("callback_query:data", async (ctx) => {
     
     Дата и время записи:
 
-    📅 ${project.formattedDate.replace(",", " в")}
+    📅 ${formattedDate}
 
     💰 Стоимость: ${project.budget}₽
     💵 Предоплата: ${project.prepayment || 0}₽
