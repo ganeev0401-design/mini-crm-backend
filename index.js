@@ -344,7 +344,7 @@ bot.hears("📁 Мои проекты", async (ctx) => {
 })
 
 // Beauty projects list
-bot.hears("📅 Мои записи", async (ctx) => {
+bot.hears("📋 Мои записи", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
 
   const { data } = await supabase
@@ -657,12 +657,13 @@ bot.on("callback_query:data", async (ctx) => {
       message = 
     `Привет, ${project.client_name}! 💅
 
-    Ты записана на услугу:
+    Вы записаны на услугу:
 
     📌 ${project.title}
     📅 ${project.deadline}
 
     💰 Стоимость: ${project.budget}₽
+    💵 Предоплата: ${a.prepayment || 0}₽
 
     Буду ждать тебя ❤️`
     } else {
@@ -685,8 +686,17 @@ bot.on("callback_query:data", async (ctx) => {
     }
 
     const text = encodeURIComponent(message)
+    
+    // User Username of Phone number
+    let link = ""
 
-    const link = `https://t.me/+${phone}?text=${text}`
+    if (phone.startsWith("@")) {
+      // username
+      link = `https://t.me/${phone.replace("@", "")}?text=${text}`
+    } else {
+      // телефон
+      link = `https://t.me/+${phone}?text=${text}`
+    }
 
     return ctx.reply("📨 Написать клиенту:", {
       reply_markup: {
