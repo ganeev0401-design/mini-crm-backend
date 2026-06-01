@@ -360,10 +360,10 @@ bot.hears("📋 Мои записи", async (ctx) => {
 
   for (const a of data) {
     await ctx.reply(
-`👤 ${a.client_name}
-💅 ${a.service}
-💰 ${a.price}₽
-📅 ${a.appointment_time}`,
+    `👤 ${a.client_name}
+    💅 ${a.service || a.title || "Услуга"}
+    💰 ${a.budget || 0}₽
+    📅 ${new Date(a.deadline).toLocaleString("ru-RU")}`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -499,9 +499,11 @@ bot.on("message:text", async (ctx) => {
         client_name: state.client_name,
         client_phone: state.client_phone,
         title: state.service,
+        service: state.service,
         budget: state.price,
         prepayment: state.prepayment,
         deadline: appointment_at,
+        appointment_at: appointment_at,
         status: "beauty"
       }
     ])
@@ -608,7 +610,7 @@ bot.on("callback_query:data", async (ctx) => {
     .eq("id", id)
     .single()
 
-  const newDate = new Date(a.appointment_time)
+  const newDate = new Date(a.appointment_at)
   newDate.setDate(newDate.getDate() + 1)
 
   await supabase
@@ -663,7 +665,7 @@ bot.on("callback_query:data", async (ctx) => {
     📅 ${project.deadline}
 
     💰 Стоимость: ${project.budget}₽
-    💵 Предоплата: ${a.prepayment || 0}₽
+    💵 Предоплата: ${project.prepayment || 0}₽
 
     Буду ждать тебя ❤️`
     } else {
