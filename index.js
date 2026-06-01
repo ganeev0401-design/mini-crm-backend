@@ -363,7 +363,14 @@ bot.hears("📋 Мои записи", async (ctx) => {
     `👤 ${a.client_name}
     💅 ${a.service || a.title || "Услуга"}
     💰 ${a.budget || 0}₽
-    📅 ${new Date(a.deadline).toLocaleString("ru-RU")}`,
+
+    📅 ${new Date(a.deadline).toLocaleString("ru-RU", {
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+        //timeZone: "Europe/Moscow"
+      })}` ,
       {
         reply_markup: {
           inline_keyboard: [
@@ -662,6 +669,9 @@ bot.on("callback_query:data", async (ctx) => {
     Вы записаны на услугу:
 
     📌 ${project.title}
+    
+    Дата и время записи:
+
     📅 ${project.deadline}
 
     💰 Стоимость: ${project.budget}₽
