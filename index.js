@@ -352,7 +352,7 @@ bot.hears("📋 Мои записи", async (ctx) => {
     .select("*")
     .eq("telegram_id", telegram_id)
     .eq("status", "beauty")
-    .order("appointment_time", { ascending: true }) // 👈 сортировка
+    .order("deadline", { ascending: true }) // 👈 сортировка
 
   if (!data?.length) {
     return ctx.reply("Записей пока нет 🤷‍♂️")
