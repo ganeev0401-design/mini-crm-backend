@@ -650,6 +650,13 @@ bot.on("callback_query:data", async (ctx) => {
     .eq("id", id)
     .single()
 
+    const formattedDate = new Date(project.deadline).toLocaleString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).replace(",", " в")
+
     if (!project) {
       return ctx.reply("Проект не найден 😢")
     }
