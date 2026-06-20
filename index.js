@@ -64,6 +64,123 @@ app.post("/auth", async (req, res) => {
   }
 })
 
+//-----------------BOOKING-----------------------
+app.post("/create-booking", async (req, res) => {
+  const {
+    master_id,
+    client_name,
+    client_phone,
+    service,
+    datetime
+  } = req.body
+
+  try {
+    // ❗ проверка занятости
+    const { data: existing } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("telegram_id", master_id)
+      .eq("appointment_at", datetime)
+
+    if (existing.length > 0) {
+      return res.json({ error: "Слот занят" })
+    }
+
+    // создаем запись
+    const { data, error } = await supabase
+      .from("projects")
+      .insert([
+        {
+          telegram_id: master_id,
+          client_name,
+          client_phone,
+          title: service,
+          service: service,
+          appointment_at: datetime,
+          deadline: datetime,
+          status: "pending"
+        }
+      ])
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // 🔥 отправляем мастеру
+    await bot.api.sendMessage(
+      master_id,
+      `🆕 Новая запись!
+
+👤 ${client_name}
+💅 ${service}
+📅 ${new Date(datetime).toLocaleString()}`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Подтвердить",
+                callback_data: `confirm_${data.id}`
+              }
+            ],
+            [
+              {
+                text: "❌ Отклонить",
+                callback_data: `reject_${data.id}`
+              }
+            ]
+          ]
+        }
+      }
+    )
+
+    res.json({ success: true })
+  } catch (e) {
+    console.log(e)
+    res.status(500).json({ error: "Ошибка" })
+  }
+})
+
+//-------------Booking Slots-------------------------
+app.get("/slots", async (req, res) => {
+  const { master_id, date } = req.query
+
+  try {
+    // получаем записи на этот день
+    const start = new Date(date)
+    const end = new Date(date)
+    end.setHours(23, 59, 59)
+
+    const { data } = await supabase
+      .from("projects")
+      .select("appointment_at")
+      .eq("telegram_id", master_id)
+      .gte("appointment_at", start.toISOString())
+      .lte("appointment_at", end.toISOString())
+
+    const booked = data.map(d =>
+      new Date(d.appointment_at).getHours() + ":00"
+    )
+
+    // генерим слоты (10:00–20:00)
+    const slots = []
+
+    for (let h = 10; h <= 20; h++) {
+      const time = `${h}:00`
+      slots.push({
+        time,
+        busy: booked.includes(time)
+      })
+    }
+
+    res.json(slots)
+  } catch (e) {
+    console.log(e)
+    res.status(500).json({ error: "Ошибка слотов" })
+  }
+})
+
+
 // -------------------- DEADLINES --------------------
 async function checkDeadlines() {
   const { data: projects } = await supabase
@@ -209,15 +326,36 @@ bot.command("start", async (ctx) => {
   { onConflict: "telegram_id" }
   ) 
 
-  ctx.reply("Кто ты? 👇", {
-    reply_markup: {
-      keyboard: [
-        ["💻 Фрилансер"],
-        ["💅 Бьюти мастер"]
-      ],
-      resize_keyboard: true
+  // ctx.reply("Кто ты? 👇", {
+  //   reply_markup: {
+  //     keyboard: [
+  //       ["💻 Фрилансер"],
+  //       ["💅 Бьюти мастер"]
+  //     ],
+  //     resize_keyboard: true
+  //   }
+  // })
+
+  const role = ctx.match // будем ловить параметр
+
+    // если это клиент (пришел по ссылке)
+    if (ctx.message.text.includes("start=client")) {
+      return ctx.reply("Записаться 👇", {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "📅 Записаться",
+                web_app: {
+                  url: "https://mini-crm-app-sigma.vercel.app/booking"
+                }
+              }
+            ]
+          ]
+        }
+      })
     }
-  })
+
 })
 
 // -------------------- CLIENTS --------------------
@@ -627,6 +765,31 @@ bot.on("callback_query:data", async (ctx) => {
 
   return ctx.answerCallbackQuery("Перенесено ⏰")
   }
+
+  // подтверждение beauty для мастера
+  if (data.startsWith("confirm_")) {
+    const id = data.split("_")[1]
+
+    await supabase
+      .from("projects")
+      .update({ status: "confirmed" })
+      .eq("id", id)
+
+    return ctx.answerCallbackQuery("Подтверждено ✅")
+  }
+
+  // отклонение
+  if (data.startsWith("reject_")) {
+    const id = data.split("_")[1]
+
+    await supabase
+      .from("projects")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+
+    return ctx.answerCallbackQuery("Отклонено ❌")
+  }
+
 
   if (data.startsWith("shift_")) {
     const id = data.split("_")[1]
