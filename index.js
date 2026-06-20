@@ -75,38 +75,34 @@ app.post("/create-booking", async (req, res) => {
   } = req.body
 
   try {
-    // ❗ проверка занятости
     const { data: existing } = await supabase
       .from("projects")
       .select("*")
       .eq("telegram_id", master_id)
       .eq("appointment_at", datetime)
 
-    if (existing.length > 0) {
+    if (existing?.length > 0) {
       return res.json({ error: "Слот занят" })
     }
 
-    // создаем запись
     const { data, error } = await supabase
       .from("projects")
-      .insert([
-        {
-          telegram_id: master_id,
-          client_name,
-          client_phone,
-          title: service,
-          service: service,
-          appointment_at: datetime,
-          deadline: datetime,
-          status: "pending"
-        }
-      ])
+      .insert([{
+        telegram_id: master_id,
+        client_name,
+        client_phone,
+        title: service,
+        service,
+        appointment_at: datetime,
+        deadline: datetime,
+        status: "pending"
+      }])
       .select()
       .single()
 
     if (error) throw error
 
-    // 🔥 отправляем мастеру
+    // 🔥 уведомление мастеру
     await bot.api.sendMessage(
       master_id,
       `🆕 Новая запись!
@@ -117,24 +113,15 @@ app.post("/create-booking", async (req, res) => {
       {
         reply_markup: {
           inline_keyboard: [
-            [
-              {
-                text: "✅ Подтвердить",
-                callback_data: `confirm_${data.id}`
-              }
-            ],
-            [
-              {
-                text: "❌ Отклонить",
-                callback_data: `reject_${data.id}`
-              }
-            ]
+            [{ text: "✅ Подтвердить", callback_data: `confirm_${data.id}` }],
+            [{ text: "❌ Отклонить", callback_data: `reject_${data.id}` }]
           ]
         }
       }
     )
 
     res.json({ success: true })
+
   } catch (e) {
     console.log(e)
     res.status(500).json({ error: "Ошибка" })
@@ -316,46 +303,44 @@ bot.command("start", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
   const name = ctx.from.first_name
 
-  // Presets
+  const payload = ctx.match // start=client
+
   await supabase.from("users").upsert(
-  [{
-    telegram_id,
-    name,
-    preset: "beauty" // <-- временно для теста
-  }],
-  { onConflict: "telegram_id" }
-  ) 
+    [{
+      telegram_id,
+      name,
+      preset: "beauty"
+    }],
+    { onConflict: "telegram_id" }
+  )
 
-  // ctx.reply("Кто ты? 👇", {
-  //   reply_markup: {
-  //     keyboard: [
-  //       ["💻 Фрилансер"],
-  //       ["💅 Бьюти мастер"]
-  //     ],
-  //     resize_keyboard: true
-  //   }
-  // })
+  // 👉 если клиент пришёл по ссылке
+  if (payload === "client") {
+    return ctx.reply("📅 Записаться 👇", {
+      reply_markup: {
+        inline_keyboard: [
+          [{
+            text: "Открыть запись",
+            web_app: {
+              url: "https://mini-crm-app-sigma.vercel.app/booking"
+            }
+          }]
+        ]
+      }
+    })
+  }
 
-  const role = ctx.match // будем ловить параметр
-
-    // если это клиент (пришел по ссылке)
-    if (ctx.message.text.includes("start=client")) {
-      return ctx.reply("Записаться 👇", {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "📅 Записаться",
-                web_app: {
-                  url: "https://mini-crm-app-sigma.vercel.app/booking"
-                }
-              }
-            ]
-          ]
-        }
-      })
+  // 👉 мастер меню
+  return ctx.reply("Кто ты? 👇", {
+    reply_markup: {
+      keyboard: [
+        ["💻 Фрилансер"],
+        ["💅 Бьюти мастер"],
+        ["🔄 Сменить режим"]
+      ],
+      resize_keyboard: true
     }
-
+  })
 })
 
 // -------------------- CLIENTS --------------------
@@ -411,6 +396,18 @@ bot.hears("💅 Бьюти мастер", async (ctx) => {
       keyboard: [
         ["➕ Новая запись"],
         ["📋 Мои записи"]
+      ],
+      resize_keyboard: true
+    }
+  })
+})
+
+bot.hears("🔄 Сменить режим", async (ctx) => {
+  await ctx.reply("Выбери режим заново 👇", {
+    reply_markup: {
+      keyboard: [
+        ["💻 Фрилансер"],
+        ["💅 Бьюти мастер"]
       ],
       resize_keyboard: true
     }
@@ -760,7 +757,7 @@ bot.on("callback_query:data", async (ctx) => {
 
   await supabase
     .from("projects")
-    .update({ appointment_time: newDate })
+    .update({ appointment_at: newDate })
     .eq("id", id)
 
   return ctx.answerCallbackQuery("Перенесено ⏰")
@@ -789,6 +786,30 @@ bot.on("callback_query:data", async (ctx) => {
 
     return ctx.answerCallbackQuery("Отклонено ❌")
   }
+
+  //----Подтверждение/Отказ записи--------
+    if (data.startsWith("confirm_")) {
+    const id = data.split("_")[1]
+
+    await supabase
+      .from("projects")
+      .update({ status: "confirmed" })
+      .eq("id", id)
+
+    return ctx.answerCallbackQuery("Запись подтверждена ✅")
+  }
+
+  if (data.startsWith("reject_")) {
+    const id = data.split("_")[1]
+
+    await supabase
+      .from("projects")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+
+    return ctx.answerCallbackQuery("Запись отклонена ❌")
+  }
+  //-----------------------------------------
 
 
   if (data.startsWith("shift_")) {
