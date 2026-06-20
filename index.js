@@ -133,10 +133,9 @@ app.get("/slots", async (req, res) => {
   const { master_id, date } = req.query
 
   try {
-    // получаем записи на этот день
     const start = new Date(date)
     const end = new Date(date)
-    end.setHours(23, 59, 59)
+    end.setHours(23, 59, 59, 999)
 
     const { data } = await supabase
       .from("projects")
@@ -145,15 +144,17 @@ app.get("/slots", async (req, res) => {
       .gte("appointment_at", start.toISOString())
       .lte("appointment_at", end.toISOString())
 
-    const booked = data.map(d =>
-      new Date(d.appointment_at).getHours() + ":00"
-    )
+    const booked = (data || []).map(d => {
+      const dte = new Date(d.appointment_at)
+      return `${dte.getHours().toString().padStart(2, "0")}:00`
+    })
 
-    // генерим слоты (10:00–20:00)
+    // 🔥 слоты каждые 1 час (можем потом сделать 30 мин)
     const slots = []
 
     for (let h = 10; h <= 20; h++) {
-      const time = `${h}:00`
+      const time = `${h.toString().padStart(2, "0")}:00`
+
       slots.push({
         time,
         busy: booked.includes(time)
@@ -161,9 +162,10 @@ app.get("/slots", async (req, res) => {
     }
 
     res.json(slots)
+
   } catch (e) {
     console.log(e)
-    res.status(500).json({ error: "Ошибка слотов" })
+    res.status(500).json({ error: "slots error" })
   }
 })
 
@@ -303,24 +305,35 @@ bot.command("start", async (ctx) => {
   const telegram_id = ctx.from.id.toString()
   const name = ctx.from.first_name
 
-  const payload = ctx.match // start=client
+  const payload = ctx.match // client или undefined
 
-  await supabase.from("users").upsert(
-    [{
-      telegram_id,
-      name,
-      preset: "beauty"
-    }],
-    { onConflict: "telegram_id" }
-  )
+  // сохраняем юзера БЕЗ жёсткого preset
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("telegram_id", telegram_id)
+    .single()
 
-  // 👉 если клиент пришёл по ссылке
+  if (!user) {
+    await supabase.from("users").insert([
+      {
+        telegram_id,
+        name,
+        role: null,
+        preset: "beauty"
+      }
+    ])
+  }
+
+  // =========================
+  // 👇 КЛИЕНТ (по ссылке)
+  // =========================
   if (payload === "client") {
-    return ctx.reply("📅 Записаться 👇", {
+    return ctx.reply("📅 Запись открыта 👇", {
       reply_markup: {
         inline_keyboard: [
           [{
-            text: "Открыть запись",
+            text: "Открыть календарь",
             web_app: {
               url: "https://mini-crm-app-sigma.vercel.app/booking"
             }
@@ -330,8 +343,10 @@ bot.command("start", async (ctx) => {
     })
   }
 
-  // 👉 мастер меню
-  return ctx.reply("Кто ты? 👇", {
+  // =========================
+  // 👇 ПЕРВЫЙ ВХОД (МАСТЕР)
+  // =========================
+  return ctx.reply("Выбери режим 👇", {
     reply_markup: {
       keyboard: [
         ["💻 Фрилансер"],
